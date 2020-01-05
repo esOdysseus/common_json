@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <fcntl.h>
 #include <unistd.h>
+#include <string.h>
 
 #include <logger.h>
 #include <json_manipulator.h>
@@ -11,6 +12,13 @@ namespace json_mng
 
 template std::shared_ptr<std::list<std::shared_ptr<std::string>>> CMjson::get_array<std::string>(std::string &key);
 template std::shared_ptr<std::list<std::shared_ptr<CMjson>>> CMjson::get_array<CMjson>(std::string &key);
+
+template std::shared_ptr<std::string> CMjson::get_second<std::string>(MemberIterator itor);
+template std::shared_ptr<int> CMjson::get_second<int>(MemberIterator itor);
+template std::shared_ptr<long> CMjson::get_second<long>(MemberIterator itor);
+template std::shared_ptr<bool> CMjson::get_second<bool>(MemberIterator itor);
+template std::shared_ptr<double> CMjson::get_second<double>(MemberIterator itor);
+template std::shared_ptr<float> CMjson::get_second<float>(MemberIterator itor);
 
 template std::shared_ptr<std::string> CMjson::get<std::string>(std::string &key);
 template std::shared_ptr<int> CMjson::get<int>(std::string &key);
@@ -60,10 +68,42 @@ bool CMjson::is_there(void) {
     return is_parsed;
 }
 
-bool CMjson::parse(std::string json_file_path) {
-    std::shared_ptr<CRawMessage> msg = file_read(json_file_path);
-    is_parsed = parse(msg);
+bool CMjson::parse(std::string input_data, const E_PARSE arg_type) {
+    try {
+        switch(arg_type) {
+        case E_PARSE::E_PARSE_FILE:
+            {
+                std::shared_ptr<CRawMessage> msg = file_read(input_data);
+                is_parsed = parse(msg);
+            }
+            break;
+        case E_PARSE::E_PARSE_MESSAGE:
+            {
+                std::shared_ptr<CRawMessage> msg = std::make_shared<CRawMessage>();
+                msg->set_new_msg(input_data.c_str(), input_data.length());
+                is_parsed = parse(msg);
+            }
+        default :
+            throw CException(E_ERROR::E_ITS_NOT_SUPPORTED_TYPE);
+        }
+    }
+    catch( const std::exception &e) {
+        LOGERR("%", e.what());
+        throw e;
+    }
     return is_parsed;
+}
+
+MemberIterator CMjson::begin(void) {
+    return get_begin_member();
+}
+
+MemberIterator CMjson::end(void) {
+    return get_end_member();
+}
+
+std::string CMjson::get_first(MemberIterator itor) {
+    return get_first_member(itor);
 }
 
 /*******************************
@@ -76,7 +116,9 @@ std::shared_ptr<CRawMessage> CMjson::file_read(std::string &json_file_path) {
     
     // open file
     fd = open(json_file_path.c_str(), O_RDONLY);
-    assert(fd > 0);
+    if (fd <= 0) {
+        LOGERR("Can not open file.(%s)", json_file_path.c_str());
+    }
 
     // read message
     while(msg_size == read_bufsize) {
@@ -97,32 +139,32 @@ std::shared_ptr<CRawMessage> CMjson::file_read(std::string &json_file_path) {
 }
 
 template<>
-std::string CMjson::get_data<std::string>(const char* data) {
+inline std::string CMjson::get_data<std::string>(const char* data) {
     return std::string(data);
 }
 
 template<>
-int CMjson::get_data<int>(const char* data) {
+inline int CMjson::get_data<int>(const char* data) {
     return atoi(data);
 }
 
 template<>
-long CMjson::get_data<long>(const char* data) {
+inline long CMjson::get_data<long>(const char* data) {
     return atol(data);
 }
 
 template<>
-bool CMjson::get_data<bool>(const char* data) {
+inline bool CMjson::get_data<bool>(const char* data) {
     return atoi(data);
 }
 
 template<>
-double CMjson::get_data<double>(const char* data) {
+inline double CMjson::get_data<double>(const char* data) {
     return atof(data);
 }
 
 template<>
-float CMjson::get_data<float>(const char* data) {
+inline float CMjson::get_data<float>(const char* data) {
     return atof(data);
 }
 
@@ -201,6 +243,22 @@ std::shared_ptr<CMjson> CMjson::get<CMjson>(ValueIterator itr) {
 }
 
 template <typename T>
+std::shared_ptr<T> CMjson::get_second(MemberIterator itor) {
+    const char* value = NULL;
+    std::shared_ptr<T> ret = std::make_shared<T>();
+
+    if ( itor->value.IsString() == true ) {
+        value = itor->value.GetString();
+        assert(value != NULL);
+        *(ret.get()) = get_data<T>(value);
+    }
+    else {
+        throw CException(E_ERROR::E_ITS_NOT_SUPPORTED_TYPE);
+    }
+    return ret;
+}
+
+template <typename T>
 std::shared_ptr<T> CMjson::get(std::string &key) {
     assert(is_there() == true);
     const char* value = NULL;
@@ -211,16 +269,7 @@ std::shared_ptr<T> CMjson::get(std::string &key) {
         throw CException(E_ERROR::E_INVALID_VALUE);
     }
     
-    if ( target->value.IsString() == true ) {
-        value = target->value.GetString();
-        assert(value != NULL);
-        *(ret.get()) = get_data<T>(value);
-    }
-    else {
-        throw CException(E_ERROR::E_ITS_NOT_SUPPORTED_TYPE);
-    }
-
-    return ret;
+    return get_second<T>(target);
 }
 
 template <>
@@ -234,8 +283,23 @@ std::shared_ptr<CMjson> CMjson::get<CMjson>(std::string &key) {
     
     return std::make_shared<CMjson>(target->value.GetObject());
 }
+
+inline MemberIterator CMjson::get_begin_member(void) {
+    assert(is_there() == true);
+    return object.get()->MemberBegin();
+}
+
+inline MemberIterator CMjson::get_end_member(void) {
+    assert(is_there() == true);
+    return object.get()->MemberEnd();
+}
+
+inline std::string CMjson::get_first_member(MemberIterator itor) {
+    return itor->name.GetString();
+}
+
 #elif JSON_LIB_HLOHMANN
     // TODO
 #endif // JSON_LIB_RAPIDJSON or JSON_LIB_HLOHMANN
 
-}
+}   // namespace json_mng

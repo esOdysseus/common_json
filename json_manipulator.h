@@ -19,6 +19,11 @@ namespace json_mng
         E_INVALID_VALUE = 4
     }E_ERROR;
 
+    typedef enum E_PARSE {
+        E_PARSE_NONE = 0,
+        E_PARSE_FILE = 1,
+        E_PARSE_MESSAGE = 2,
+    } E_PARSE;
 
     class CMjson {
     public:
@@ -30,7 +35,16 @@ namespace json_mng
 
         bool is_there(void);
 
-        bool parse(std::string json_file_path);
+        bool parse(std::string input_data, const E_PARSE arg_type=E_PARSE::E_PARSE_FILE);
+
+        MemberIterator begin(void);
+
+        MemberIterator end(void);
+
+        static std::string get_first(MemberIterator itor);
+
+        template <typename T=std::string>
+        static std::shared_ptr<T> get_second(MemberIterator itor);
 
         template <typename T=std::string>
         std::shared_ptr<T> get_member(std::string key) {
@@ -67,7 +81,13 @@ namespace json_mng
         std::shared_ptr<T> get(std::string &key);
 
         template <typename T>
-        T get_data(const char* data);
+        static T get_data(const char* data);
+
+        MemberIterator get_begin_member(void);
+
+        MemberIterator get_end_member(void);
+
+        static std::string get_first_member(MemberIterator itor);
 
     private:
         bool is_parsed;

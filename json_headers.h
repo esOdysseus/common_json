@@ -9,10 +9,18 @@
 
     namespace json_mng
     {
+        /** for Json Parser. */
         using JsonManipulator = rapidjson::Document;
-        using ValueIterator = rapidjson::Value::ValueIterator;
+        /** for Object. */
         using Object_Type = rapidjson::Value::Object;
+        /** for Value. */
+        using Value_Type = rapidjson::Value;
+        /** for Array-values. */
+        using ValueIterator = rapidjson::Value::ValueIterator;
+        /** for Object-members. */
+        using MemberIterator = rapidjson::Value::MemberIterator;
     }
+    
 #elif JSON_LIB_HLOHMANN
     // TODO
 #else
